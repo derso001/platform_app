@@ -1,0 +1,22 @@
+[project]
+name = "test-pletform-back"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "derso001",email = "bor.zdorovets28@gmail.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi (>=0.163.1,<0.164.0)",
+    "uvicorn (>=0.54.0,<0.55.0)",
+    "sqlalchemy (>=2.1.8,<3.0.0)",
+    "asyncpg (>=0.32.0,<0.33.0)",
+    "python-dotenv (>=1.2.4,<2.0.0)",
+    "pydantic (>=2.14.3,<3.0.0)",
+    "greenlet (>=3.5.6,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
