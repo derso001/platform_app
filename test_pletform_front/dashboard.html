@@ -7,66 +7,68 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="output.css">
 </head>
-<body class="min-h-screen py-6 px-4">
+<body class="min-h-screen py-6 px-4 bg-[#0B0F19] text-slate-200">
 
     <div class="max-w-4xl mx-auto space-y-6">
         <header class="text-center mb-8">
             <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
                 <span class="neon-text-cyan">OS Explorer</span> Кабінет викладача
             </h1>
-            <p class="text-slate-400 text-sm">Створення нового тесту та генерація посилання</p>
+            <p class="text-slate-400 text-sm">Повноцінний конструктор тестів</p>
         </header>
 
         <!-- БЛОК 1: Основна інформація -->
-        <section class="glass-panel p-5">
+        <section class="glass-panel p-5 bg-slate-900/50 border border-slate-800 rounded-xl shadow-lg">
             <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">1. Основна інформація</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Головне слово (з неоновим ефектом)</label>
-                    <input type="text" id="meta-highlight" class="w-full bg-slate-900/80 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="OS Explorer">
+                    <input type="text" id="meta-highlight" class="w-full bg-slate-950 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="OS Explorer">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Продовження назви</label>
-                    <input type="text" id="meta-main" class="w-full bg-slate-900/80 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="Практикум">
+                    <input type="text" id="meta-main" class="w-full bg-slate-950 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="Практикум">
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-xs text-slate-400 mb-1">Підзаголовок (опис тесту)</label>
-                    <input type="text" id="meta-subtitle" class="w-full bg-slate-900/80 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="Тема 1. Комплексна перевірка">
+                    <input type="text" id="meta-subtitle" class="w-full bg-slate-950 border border-slate-700 rounded py-2 px-3 text-sm focus:border-cyan-500 text-white outline-none transition-colors" value="Тема 1. Комплексна перевірка">
                 </div>
             </div>
         </section>
 
-        <!-- БЛОК 2: Модулі із завданнями -->
-        <section class="glass-panel p-5">
-            <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">2. Блоки із завданнями</h2>
-            
-            <p class="text-xs text-slate-400 mb-3">Використовуйте кнопки для вставки шаблонів завдань. Уважно редагуйте текст всередині лапок.</p>
-            
-            <!-- Панель інструментів (кнопки) -->
-            <div class="flex flex-wrap gap-2 mb-4">
-                <button onclick="insertTemplate('radio')" class="bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-700 text-cyan-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Один варіант</button>
-                <button onclick="insertTemplate('pairs')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700 text-purple-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Логічні пари</button>
-                <button onclick="insertTemplate('ordering')" class="bg-pink-900/40 hover:bg-pink-800/60 border border-pink-700 text-pink-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Впорядкування</button>
-                <button onclick="insertTemplate('sorting')" class="bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700 text-emerald-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Сортування</button>
-                <button onclick="insertTemplate('mistakes')" class="bg-orange-900/40 hover:bg-orange-800/60 border border-orange-700 text-orange-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Знайти помилки</button>
-                <button onclick="insertTemplate('fillIn')" class="bg-indigo-900/40 hover:bg-indigo-800/60 border border-indigo-700 text-indigo-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Пропуски в тексті</button>
-                <button onclick="insertTemplate('open')" class="bg-teal-900/40 hover:bg-teal-800/60 border border-teal-700 text-teal-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Вільна відповідь</button>
-                <button onclick="insertTemplate('typing')" class="bg-rose-900/40 hover:bg-rose-800/60 border border-rose-700 text-rose-300 px-2 py-1.5 rounded text-[11px] font-medium transition-colors">+ Тренажер друку</button>
-            </div>
-            <div class="flex justify-between items-end mb-2 mt-6">
-                <label class="block text-sm font-bold text-slate-300">Редактор завдань (JSON)</label>
-                <button onclick="copyAIPrompt()" class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow-[0_0_10px_rgba(167,139,250,0.3)] transition-all active:scale-95 flex items-center gap-1">
-                    ✨ Згенерувати через ШІ (Копіювати промпт)
+        <!-- БЛОК 2: Конструктор завдань -->
+        <section class="glass-panel p-5 bg-slate-900/50 border border-slate-800 rounded-xl shadow-lg">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-slate-700 pb-2">
+                <h2 class="text-lg font-bold text-white">2. Блоки із завданнями</h2>
+                <button onclick="openAIModal()" class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-4 py-2 rounded text-xs font-bold shadow-[0_0_10px_rgba(167,139,250,0.3)] transition-all active:scale-95 flex items-center gap-2">
+                    ✨ Згенерувати через ШІ
                 </button>
             </div>
+            
+            <p class="text-xs text-slate-400 mb-4">Додавайте нові блоки вручну за допомогою кнопок нижче, або імпортуйте готовий JSON через ШІ.</p>
+            
+            <!-- Панель інструментів (кнопки додавання) -->
+            <div class="flex flex-wrap gap-2 mb-6 p-3 bg-slate-950/50 rounded-lg border border-slate-800/50">
+                <button onclick="addModule('radio')" class="bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-700 text-cyan-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Один варіант</button>
+                <button onclick="addModule('pairs')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700 text-purple-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Логічні пари</button>
+                <button onclick="addModule('ordering')" class="bg-pink-900/40 hover:bg-pink-800/60 border border-pink-700 text-pink-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Впорядкування</button>
+                <button onclick="addModule('sorting')" class="bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700 text-emerald-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Сортування</button>
+                <button onclick="addModule('mistakes')" class="bg-orange-900/40 hover:bg-orange-800/60 border border-orange-700 text-orange-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Знайти помилки</button>
+                <button onclick="addModule('fillIn')" class="bg-indigo-900/40 hover:bg-indigo-800/60 border border-indigo-700 text-indigo-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Пропуски в тексті</button>
+                <button onclick="addModule('open')" class="bg-teal-900/40 hover:bg-teal-800/60 border border-teal-700 text-teal-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Вільна відповідь</button>
+                <button onclick="addModule('typing')" class="bg-rose-900/40 hover:bg-rose-800/60 border border-rose-700 text-rose-300 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">+ Тренажер друку</button>
+            </div>
 
-            <!-- Редактор JSON -->
-            <textarea id="modules-editor" rows="15" class="w-full bg-slate-950 border border-slate-700 rounded py-3 px-4 text-sm font-mono text-emerald-400 focus:border-cyan-500 outline-none transition-colors" spellcheck="false">[
-]</textarea>
-            <p id="json-error" class="text-red-500 text-xs mt-2 hidden">Помилка у структурі завдань! Перевірте коми та дужки.</p>
+            <!-- ГОЛОВНИЙ КОНТЕЙНЕР КОНСТРУКТОРА -->
+            <div id="visual-editor-content" class="space-y-6">
+                <!-- Сюди JS малюватиме картки завдань -->
+                <div class="text-center py-10 text-slate-500 text-sm font-medium border-2 border-dashed border-slate-700 rounded-xl">
+                    Тест поки порожній. Додайте перший блок!
+                </div>
+            </div>
         </section>
 
-        <!-- БЛОК 3: Генерація -->
+        <!-- БЛОК 3: Збереження -->
         <div class="text-center pt-4">
             <button id="saveBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-3 rounded font-bold shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all active:scale-95 text-sm">
                 Зберегти тест у базу
@@ -74,8 +76,8 @@
         </div>
 
         <!-- Результат -->
-        <div id="result-box" class="hidden glass-panel p-6 text-center border border-green-500/50 mt-8">
-            <h3 class="text-lg font-bold text-white mb-2">Тест успішно створено! 🎉</h3>
+        <div id="result-box" class="hidden glass-panel p-6 text-center border border-green-500/50 mt-8 rounded-xl bg-slate-900/80">
+            <h3 class="text-lg font-bold text-white mb-2">Тест успішно збережено! 🎉</h3>
             <p class="text-sm text-slate-300 mb-4">Скопіюйте це посилання та надішліть учням:</p>
             <div class="bg-black/50 border border-slate-600 rounded p-3 flex items-center justify-between gap-4">
                 <input type="text" id="generated-link" class="bg-transparent text-cyan-400 font-mono text-sm w-full outline-none" readonly>
@@ -83,6 +85,41 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: ІМПОРТ ВІД ШІ -->
+    <div id="ai-import-modal" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 rounded-t-xl">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">✨ Імпорт завдань від ШІ</h2>
+                <button onclick="closeAIModal()" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 flex flex-col gap-4">
+                <div class="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-lg">
+                    <h3 class="text-indigo-400 font-bold text-sm mb-2">Як це працює:</h3>
+                    <ol class="list-decimal list-inside text-xs text-slate-300 space-y-1">
+                        <li>Натисніть кнопку <b>"Скопіювати промпт"</b>.</li>
+                        <li>Вставте його в ChatGPT або Claude, дописавши свою тему.</li>
+                        <li>Скопіюйте отриманий JSON-код і вставте в поле нижче.</li>
+                    </ol>
+                    <button onclick="copyAIPrompt()" class="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded text-xs font-bold transition-all active:scale-95">
+                        📋 Скопіювати промпт
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-2">Вставте згенерований JSON сюди:</label>
+                    <textarea id="ai-json-input" rows="8" class="w-full bg-slate-950 border border-slate-700 rounded py-3 px-4 text-xs font-mono text-emerald-400 focus:border-cyan-500 outline-none transition-colors" spellcheck="false" placeholder="[ { type: 'radio', ... } ]"></textarea>
+                    <p id="ai-json-error" class="text-red-500 text-xs mt-2 hidden font-medium">Помилка парсингу! Перевірте синтаксис JSON.</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-3 rounded-b-xl">
+                <button onclick="closeAIModal()" class="px-4 py-2 rounded text-sm text-slate-300 hover:bg-slate-800 border border-slate-700 transition-colors">Скасувати</button>
+                <button onclick="importAIJson()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded text-sm font-bold shadow-[0_0_10px_rgba(0,242,254,0.2)] transition-all">Імпортувати в конструктор</button>
+            </div>
+        </div>
     </div>
 
     <script src="dashboard.js"></script>
