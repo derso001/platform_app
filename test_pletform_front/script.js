@@ -42,17 +42,39 @@ const renderers = {
     },
     'pairs': (mod, index) => {
         let html = renderHeader(index, mod.title, mod.theme);
-        html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="mod-${index}">`;
-        const selectOptions = mod.data.map(p => `<option value="${p.type}">${p.desc}</option>`).sort(() => Math.random() - 0.5).join('');
+        html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs" id="mod-${index}">`;
+        
+        // Ліва колонка: терміни та порожні слоти для перетягування
+        let leftCol = `<div class="flex flex-col gap-3">`;
         mod.data.forEach((item) => {
-            html += `
-                <div class="flex justify-between items-center bg-slate-800/30 p-1.5 rounded border border-slate-700/50 pair-block" data-type="${item.type}">
-                    <span class="font-mono text-cyan-400">${item.ext}</span>
-                    <select class="rounded p-1 text-[11px] w-36"><option value="">-- Оберіть --</option>${selectOptions}</select>
+            leftCol += `
+                <div class="flex gap-3 pair-row" data-type="${item.type}">
+                    <div class="w-1/2 p-2.5 bg-slate-800/80 border border-slate-700 rounded text-cyan-400 font-mono text-center flex items-center justify-center shadow-sm">
+                        ${item.ext}
+                    </div>
+                    <div class="pair-drop-zone w-1/2 p-2.5 min-h-[45px] border-2 border-dashed border-slate-600 rounded bg-slate-900/50 transition-colors flex items-center justify-center text-slate-500">
+                    </div>
                 </div>
             `;
         });
-        return html + `</div>`;
+        leftCol += `</div>`;
+
+        // Права колонка: перемішані картки відповідей
+        let rightCol = `<div id="pair-options-${index}" class="flex flex-col gap-2 bg-slate-800/30 p-3 rounded-lg border border-slate-800 min-h-[150px] pair-options-container">
+            <h4 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Варіанти (перетягніть вліво):</h4>`;
+        
+        const shuffledAnswers = [...mod.data].sort(() => Math.random() - 0.5);
+        shuffledAnswers.forEach(item => {
+            rightCol += `
+                <div class="pair-draggable p-2.5 bg-slate-700 border border-slate-600 rounded text-slate-200 cursor-grab hover:border-purple-500 hover:bg-slate-600 transition-all text-center shadow-sm" draggable="true" data-type="${item.type}">
+                    ${item.desc}
+                </div>
+            `;
+        });
+        rightCol += `</div>`;
+
+        html += leftCol + rightCol + `</div>`;
+        return html;
     },
     'ordering': (mod, index) => {
         let html = renderHeader(index, mod.title, mod.theme);
@@ -88,16 +110,16 @@ const renderers = {
     },
     'mistakes': (mod, index) => {
         let html = renderHeader(index, mod.title, mod.theme);
-        if (mod.subtitle) html += `<p class="text-[11px] text-slate-400 mb-2">${mod.subtitle}</p>`;
-        html += `<div class="grid gap-1.5" id="mod-${index}">`;
+        if (mod.subtitle) html += `<p class="text-[11px] text-slate-400 mb-3">${mod.subtitle}</p>`;
+        html += `<div class="flex flex-col gap-2" id="mod-${index}">`; // flex-col замість grid для стабільної ширини
         mod.data.forEach((item) => {
             html += `
-                <label class="cursor-pointer flex items-center p-1.5 rounded bg-white/5 hover:bg-white/10 transition-colors text-xs mistake-block" data-bad="${item.bad}">
+                <label class="cursor-pointer flex items-start p-3 w-full rounded-lg bg-slate-800/40 border border-slate-700 hover:bg-slate-700/50 transition-all text-xs mistake-block" data-bad="${item.bad}">
                     <input type="checkbox" class="peer hidden">
-                    <div class="w-3.5 h-3.5 rounded border border-slate-500 mr-2 flex items-center justify-center peer-checked:border-cyan-400">
-                        <div class="w-2 h-2 rounded-sm indicator transition-colors"></div>
+                    <div class="w-4 h-4 mt-0.5 rounded border border-slate-500 mr-3 flex-shrink-0 flex items-center justify-center peer-checked:border-cyan-400 peer-checked:bg-cyan-900/30">
+                        <div class="w-2.5 h-2.5 rounded-sm indicator transition-colors"></div>
                     </div>
-                    <span class="font-mono text-slate-300">${item.n}</span>
+                    <span class="font-mono text-slate-300 leading-relaxed">${item.n}</span>
                 </label>
             `;
         });
@@ -105,9 +127,15 @@ const renderers = {
     },
     'fill-in': (mod, index) => {
         let html = renderHeader(index, mod.title, mod.theme);
-        html += `<div class="text-xs leading-relaxed space-y-3" id="mod-${index}">`;
+        html += `<div class="text-sm leading-relaxed space-y-4" id="mod-${index}">`;
         mod.data.forEach((item, i) => {
-            html += `<p>${item.pre}<input type="text" class="inline-input fill-input bg-black/30 border-b border-dashed border-purple-500 text-cyan-400 text-center outline-none focus:border-cyan-400 focus:border-solid transition-colors w-36 px-1" data-ans="${item.ans}" placeholder="${item.placeholder}" autocomplete="off">${item.post}</p>`;
+            html += `
+                <p class="text-slate-300">
+                    ${item.pre}
+                    <input type="text" class="fill-input bg-slate-900 border-b-2 border-slate-600 text-cyan-400 text-center outline-none focus:border-cyan-400 focus:bg-slate-800 transition-all w-32 px-2 py-1 mx-1 font-mono text-sm" data-ans="${item.ans.toLowerCase()}" placeholder="${item.placeholder}" autocomplete="off">
+                    ${item.post}
+                </p>
+            `;
         });
         return html + `</div>`;
     },
@@ -194,6 +222,49 @@ function initApp() {
                 sortableInstances.push(new Sortable(document.getElementById(`folder-${modId}-${folder.id}`), dndOpts));
             });
         }
+        if (mod.type === 'pairs') {
+            const draggables = document.querySelectorAll(`#section-mod-${modId} .pair-draggable`);
+            const dropZones = document.querySelectorAll(`#section-mod-${modId} .pair-drop-zone`);
+            const optionsContainer = document.getElementById(`pair-options-${modId}`);
+
+            draggables.forEach(draggable => {
+                draggable.addEventListener('dragstart', () => {
+                    draggable.classList.add('dragging', 'opacity-40');
+                });
+                draggable.addEventListener('dragend', () => {
+                    draggable.classList.remove('dragging', 'opacity-40');
+                });
+            });
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    zone.classList.add('border-purple-500', 'bg-purple-900/20'); 
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                });
+                zone.addEventListener('drop', e => {
+                    e.preventDefault();
+                    zone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                    const draggedElement = document.querySelector('.dragging');
+                    if (!draggedElement) return;
+
+                    // Якщо тут вже є картка, кидаємо її назад у загальний список
+                    if (zone.children.length > 0) {
+                        optionsContainer.appendChild(zone.children[0]);
+                    }
+                    zone.appendChild(draggedElement);
+                });
+            });
+
+            optionsContainer.addEventListener('dragover', e => e.preventDefault());
+            optionsContainer.addEventListener('drop', e => {
+                e.preventDefault();
+                const draggedElement = document.querySelector('.dragging');
+                if (draggedElement) optionsContainer.appendChild(draggedElement);
+            });
+        }
         if (mod.type === 'typing') {
             const ti = document.getElementById(`typing-input-${modId}`);
             const td = document.getElementById(`typing-display-${modId}`);
@@ -243,8 +314,14 @@ const validators = {
     },
     'pairs': (mod, index) => {
         let score = 0;
-        document.querySelectorAll(`#mod-${index} .pair-block`).forEach(block => {
-            if (block.querySelector('select').value === block.dataset.type) score += mod.points;
+        document.querySelectorAll(`#mod-${index} .pair-row`).forEach(row => {
+            const correctType = row.dataset.type;
+            const dropZone = row.querySelector('.pair-drop-zone');
+            // Перевіряємо, чи є в слоті картка і чи збігається її тип
+            if (dropZone.children.length > 0) {
+                const droppedCard = dropZone.children[0];
+                if (droppedCard.dataset.type === correctType) score += mod.points;
+            }
         });
         return score;
     },
@@ -278,7 +355,12 @@ const validators = {
     'fill-in': (mod, index) => {
         let score = 0;
         document.querySelectorAll(`#mod-${index} .fill-input`).forEach(input => {
-            if (input.value.toLowerCase().trim().includes(input.dataset.ans)) score += mod.points;
+            let userAnswer = input.value.toLowerCase().trim();
+            let correctAnswer = input.dataset.ans;
+            // Якщо ввів хоч щось і воно збігається — даємо бал
+            if (userAnswer && correctAnswer.includes(userAnswer)) {
+                score += mod.points;
+            }
         });
         return score;
     },
@@ -312,14 +394,24 @@ const answerRevealers = {
         });
     },
     'pairs': (mod, index) => {
-        document.querySelectorAll(`#mod-${index} .pair-block`).forEach(b => {
-            let sel = b.querySelector('select');
-            if (sel.value) {
-                if (sel.value === b.dataset.type) {
-                    b.classList.add('border-green-500', 'bg-green-900/20');
+        document.querySelectorAll(`#mod-${index} .pair-row`).forEach(row => {
+            const correctType = row.dataset.type;
+            const dropZone = row.querySelector('.pair-drop-zone');
+            
+            if (dropZone.children.length > 0) {
+                const droppedCard = dropZone.children[0];
+                // Підсвічуємо картку зеленим або червоним
+                if (droppedCard.dataset.type === correctType) {
+                    droppedCard.classList.replace('bg-slate-700', 'bg-green-800');
+                    droppedCard.classList.add('border-green-400');
                 } else {
-                    b.classList.add('border-red-500', 'bg-red-900/20');
+                    droppedCard.classList.replace('bg-slate-700', 'bg-red-800');
+                    droppedCard.classList.add('border-red-400');
                 }
+            } else {
+                // Якщо учень взагалі не перетягнув картку
+                dropZone.classList.replace('border-slate-600', 'border-red-500/50');
+                dropZone.classList.add('bg-red-900/10');
             }
         });
     },
@@ -338,6 +430,7 @@ const answerRevealers = {
         });
     },
     'sorting': (mod, index) => {
+        // Підсвітка перетягнутих карток у папках
         document.querySelectorAll(`#section-mod-${index} .sortable-folder`).forEach(folder => {
             const folderType = folder.dataset.ftype;
             Array.from(folder.children).forEach(item => {
@@ -350,33 +443,53 @@ const answerRevealers = {
                 }
             });
         });
+        
+        // Підсвічуємо червоним елементи, які учень не розсортував (залишилися зверху)
+        document.querySelectorAll(`#pool-${index} .sorting-item`).forEach(item => {
+            item.classList.replace('bg-slate-700', 'bg-red-800');
+            item.classList.replace('border-slate-500', 'border-red-400');
+        });
     },
     'mistakes': (mod, index) => {
         document.querySelectorAll(`#mod-${index} .mistake-block`).forEach(b => {
-            let isChecked = b.querySelector('input').checked;
+            let input = b.querySelector('input');
+            let isChecked = input.checked;
             let isBad = b.dataset.bad === 'true';
             
+            input.disabled = true; // Блокуємо зміну після перевірки, щоб учень не клікав далі
+            
+            // Реагуємо ТІЛЬКИ на ті чекбокси, які учень вибрав
             if (isChecked) {
-                b.classList.remove('bg-white/5');
-                b.classList.add('border');
-                
                 if (isBad) {
-                    b.classList.add('border-green-500', 'bg-green-900/40'); 
+                    // Учень правильно знайшов помилкове твердження
+                    b.classList.replace('bg-slate-800/40', 'bg-green-900/20');
+                    b.classList.replace('border-slate-700', 'border-green-500/50');
                 } else {
-                    b.classList.add('border-red-500', 'bg-red-900/40'); 
+                    // Учень вибрав правильне твердження (помилився)
+                    b.classList.replace('bg-slate-800/40', 'bg-red-900/20');
+                    b.classList.replace('border-slate-700', 'border-red-500/50');
                 }
             }
+            // Якщо учень нічого не вибрав (!isChecked), ми нічого не робимо
+            // Таким чином правильні відповіді залишаються прихованими
         });
     },
     'fill-in': (mod, index) => {
         document.querySelectorAll(`#mod-${index} .fill-input`).forEach(input => {
-            if (input.value.trim() !== '') {
-                input.classList.remove('text-cyan-400', 'border-purple-500');
-                
-                if (input.value.toLowerCase().trim().includes(input.dataset.ans)) {
-                    input.classList.add('text-emerald-400', 'border-emerald-500');
-                } else {
-                    input.classList.add('text-red-400', 'border-red-500');
+            let userAnswer = input.value.toLowerCase().trim();
+            let correctAnswer = input.dataset.ans;
+            
+            input.disabled = true; // Блокуємо поле після перевірки
+            
+            if (userAnswer && correctAnswer.includes(userAnswer)) {
+                input.classList.replace('text-cyan-400', 'text-emerald-400');
+                input.classList.replace('border-slate-600', 'border-emerald-500');
+            } else {
+                input.classList.replace('text-cyan-400', 'text-red-400');
+                input.classList.replace('border-slate-600', 'border-red-500');
+                // Просто робимо напівпрозорим, НЕ підставляючи правильну відповідь
+                if (!userAnswer) {
+                    input.classList.add('opacity-50');
                 }
             }
         });

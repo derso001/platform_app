@@ -57,3 +57,50 @@ async def get_test(test_id: str, db: AsyncSession = Depends(get_db)):
             "modules": test.modules
         }
     }
+
+# 3. ОТРИМАТИ ВСІ ТЕСТИ (Для панелі керування вчителя)
+@app.get("/api/tests/")
+async def get_all_tests(db: AsyncSession = Depends(get_db)):
+    # Беремо всі тести, сортуючи від найновіших до найстаріших
+    result = await db.execute(select(TestDB).order_by(TestDB.created_at.desc()))
+    tests = result.scalars().all()
+    
+    return {
+        "status": "success",
+        "data": [
+            {
+                "id": t.id,
+                "created_at": t.created_at,
+                "meta": t.meta_data,
+                # Модулі сюди не тягнемо, щоб не вантажити гігабайти даних у список
+            } for t in tests
+        ]
+    }
+
+# 4. ОНОВИТИ ТЕСТ (Після ручного редагування на фронтенді)
+@app.put("/api/tests/{test_id}")
+async def update_test(test_id: str, test_data: TestCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TestDB).where(TestDB.id == test_id))
+    test = result.scalars().first()
+    
+    if not test:
+        raise HTTPException(status_code=404, detail="Тест не знайдено")
+        
+    test.meta_data = test_data.meta
+    test.modules = test_data.modules
+    
+    await db.commit()
+    return {"status": "success", "message": "Тест успішно оновлено"}
+
+# 5. ВИДАЛИТИ ТЕСТ
+@app.delete("/api/tests/{test_id}")
+async def delete_test(test_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TestDB).where(TestDB.id == test_id))
+    test = result.scalars().first()
+    
+    if not test:
+        raise HTTPException(status_code=404, detail="Тест не знайдено")
+        
+    await db.delete(test)
+    await db.commit()
+    return {"status": "success", "message": "Тест видалено"}
