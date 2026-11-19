@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вхід у кабінет викладача | OS Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+        <div class="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-mono mb-4">
+            OS Explorer • Teacher Studio
+        </div>
+        <h1 class="text-2xl font-bold text-white mb-2">Особистий кабінет</h1>
+        <p class="text-slate-400 text-xs mb-8">Увійдіть через Google-акаунт, щоб створювати та керувати власними тестами</p>
+
+        <!-- Кнопка Google -->
+        <div class="flex justify-center">
+            <div id="g_id_onload"
+                 data-client_id="192347779749-q0t1kej5mq40sv8778pb952p0i0oglle.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="filled_black"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+
+        <p id="login-error" class="hidden text-red-400 text-xs mt-4"></p>
+    </div>
+
+    <script>
+        // Якщо вже є токен — одразу кидаємо в кабінет
+        if (localStorage.getItem('auth_token')) {
+            window.location.href = 'dashboard.html';
+        }
+
+        async function handleCredentialResponse(response) {
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.add('hidden');
+
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.status === 'success') {
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user_info', JSON.stringify(data.user));
+                    window.location.href = 'dashboard.html';
+                } else {
+                    errorEl.innerText = data.detail || "Помилка авторизації через Google";
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.innerText = "Сервер недоступний. Перевірте, чи запущено FastAPI.";
+                errorEl.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

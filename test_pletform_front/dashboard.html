@@ -6,16 +6,56 @@
     <title>Кабінет викладача | Конструктор</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="output.css">
+    <script>
+    if (!localStorage.getItem('auth_token')) {
+        window.location.href = 'login.html';
+    }
+</script>
 </head>
 <body class="min-h-screen py-6 px-4 bg-[#0B0F19] text-slate-200">
 
     <div class="max-w-4xl mx-auto space-y-6">
         <header class="text-center mb-8">
+            <div class="flex justify-end items-center mb-4">
+                <div id="user-profile-badge" class="flex items-center gap-3 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full shadow-md">
+                    <img id="user-avatar" src="" alt="Avatar" class="w-6 h-6 rounded-full hidden border border-cyan-500/50">
+                    <span id="user-name" class="text-xs font-medium text-slate-200">Завантаження...</span>
+                    <button onclick="logout()" class="text-[11px] text-red-400 hover:text-red-300 font-bold ml-1 pl-2 border-l border-slate-700 transition-colors">
+                        Вийти
+                    </button>
+                </div>
+            </div>
             <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
                 <span class="neon-text-cyan">OS Explorer</span> Кабінет викладача
             </h1>
             <p class="text-slate-400 text-sm">Повноцінний конструктор тестів</p>
         </header>
+
+        <!-- Навігація кабінету -->
+        <div class="flex justify-center gap-3 mb-6">
+            <button id="tab-builder-btn" onclick="switchTab('builder')" class="bg-cyan-600 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-[0_0_12px_rgba(0,242,254,0.3)] transition-all">
+                🛠️ Конструктор
+            </button>
+            <button id="tab-list-btn" onclick="switchTab('list')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-5 py-2 rounded-lg text-xs font-bold transition-all">
+                📚 Мої тести
+            </button>
+        </div>
+
+        <!-- ВКЛАДКА: СПИСОК СТВОРЕНИХ ТЕСТІВ -->
+        <section id="tests-list-section" class="hidden glass-panel p-5 bg-slate-900/50 border border-slate-800 rounded-xl shadow-lg">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h2 class="text-lg font-bold text-white">Збережені тести</h2>
+                <button onclick="startNewTest()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-all">
+                    + Створити новий тест
+                </button>
+            </div>
+            <div id="tests-list-container" class="space-y-3">
+                <!-- Сюди рендеряться картки тестів -->
+            </div>
+        </section>
+
+        <!-- ОБГОРТКА КОНСТРУКТОРА -->
+        <div id="builder-section" class="space-y-6">
 
         <!-- БЛОК 1: Основна інформація -->
         <section class="glass-panel p-5 bg-slate-900/50 border border-slate-800 rounded-xl shadow-lg">

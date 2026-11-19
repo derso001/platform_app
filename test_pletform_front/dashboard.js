@@ -1,5 +1,53 @@
+const authToken = localStorage.getItem('auth_token');
+if (!authToken) {
+    window.location.href = 'login.html';
+}
+
+function getAuthHeaders(withContentType = false) {
+    const headers = {
+        'Authorization': `Bearer ${authToken}`
+    };
+    if (withContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    return headers;
+}
+
+function handleUnauthorized(status) {
+    if (status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        window.location.href = 'login.html';
+        return true;
+    }
+    return false;
+}
+
+function logout() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_info');
+    window.location.href = 'login.html';
+}
+
+// Відображення імені та аватарки у шапці при завантаженні
+document.addEventListener('DOMContentLoaded', () => {
+    const userInfoRaw = localStorage.getItem('user_info');
+    if (userInfoRaw) {
+        const user = JSON.parse(userInfoRaw);
+        const nameEl = document.getElementById('user-name');
+        const avatarEl = document.getElementById('user-avatar');
+        
+        if (nameEl) nameEl.innerText = user.name || user.email;
+        if (avatarEl && user.avatar) {
+            avatarEl.src = user.avatar;
+            avatarEl.classList.remove('hidden');
+        }
+    }
+});
+
 // Головний масив, який зберігає структуру нашого тесту
 let testData = [];
+let editingTestId = null;
 
 // ==========================================
 // 1. ШАБЛОНИ ТА ПРОМПТ ШІ
@@ -451,38 +499,496 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     };
 
     const saveBtn = document.getElementById('saveBtn');
-    saveBtn.innerText = "Збереження...";
+    const isUpdating = Boolean(editingTestId);
+    const url = isUpdating 
+        ? `http://127.0.0.1:8000/api/tests/${editingTestId}` 
+        : 'http://127.0.0.1:8000/api/tests/';
+    const method = isUpdating ? 'PUT' : 'POST';
+
+    saveBtn.innerText = isUpdating ? "Оновлення..." : "Збереження...";
     saveBtn.disabled = true;
 
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/tests/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        const response = await fetch(url, {
+            method: method,
+            headers: getAuthHeaders(true),
             body: JSON.stringify(payload)
         });
+
+        if (handleUnauthorized(response.status)) return;
 
         const result = await response.json();
 
         if (response.ok && result.status === 'success') {
-            const currentHost = window.location.origin; 
-            const finalLink = `${currentHost}/index.html?id=${result.test_id}`;
+            const savedId = isUpdating ? editingTestId : result.test_id;
+            const finalLink = `${window.location.origin}/index.html?id=${savedId}`;
             
             document.getElementById('generated-link').value = finalLink;
             document.getElementById('result-box').classList.remove('hidden');
             document.getElementById('result-box').scrollIntoView({ behavior: 'smooth' });
-            
-            saveBtn.innerText = "Зберегти тест у базу";
-            saveBtn.disabled = false;
         } else {
             alert("Помилка на сервері: " + JSON.stringify(result));
-            saveBtn.innerText = "Зберегти тест у базу";
-            saveBtn.disabled = false;
         }
-
     } catch (err) {
         alert("Не вдалося підключитися до бази даних. Перевірте, чи працює FastAPI (uvicorn).");
-        saveBtn.innerText = "Зберегти тест у базу";
-        saveBtn.disabled = false;
         console.error(err);
+    } finally {
+        saveBtn.innerText = isUpdating ? "Оновити тест у базі" : "Зберегти тест у базу";
+        saveBtn.disabled = false;
     }
 });
+
+// ==========================================
+// 5. КЕРУВАННЯ СПИСКОМ ТЕСТІВ (CRUD)
+// ==========================================
+
+function switchTab(tab) {
+    const builderSec = document.getElementById('builder-section');
+    const listSec = document.getElementById('tests-list-section');
+    const builderBtn = document.getElementById('tab-builder-btn');
+    const listBtn = document.getElementById('tab-list-btn');
+
+    if (tab === 'builder') {
+        builderSec.classList.remove('hidden');
+        listSec.classList.add('hidden');
+        builderBtn.className = "bg-cyan-600 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-[0_0_12px_rgba(0,242,254,0.3)] transition-all";
+        listBtn.className = "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-5 py-2 rounded-lg text-xs font-bold transition-all";
+    } else {
+        builderSec.classList.add('hidden');
+        listSec.classList.remove('hidden');
+        listBtn.className = "bg-cyan-600 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-[0_0_12px_rgba(0,242,254,0.3)] transition-all";
+        builderBtn.className = "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-5 py-2 rounded-lg text-xs font-bold transition-all";
+        loadTestsList();
+    }
+}
+
+function startNewTest() {
+    editingTestId = null;
+    testData = [];
+    document.getElementById('meta-highlight').value = "OS Explorer";
+    document.getElementById('meta-main').value = "Практикум";
+    document.getElementById('meta-subtitle').value = "";
+    document.getElementById('saveBtn').innerText = "Зберегти тест у базу";
+    document.getElementById('result-box').classList.add('hidden');
+    renderVisualEditor();
+    switchTab('builder');
+}
+
+async function loadTestsList() {
+    const container = document.getElementById('tests-list-container');
+    container.innerHTML = `<p class="text-cyan-400 text-xs font-mono animate-pulse text-center py-6">Завантаження тестів...</p>`;
+
+    try {
+        const res = await fetch('http://127.0.0.1:8000/api/tests/', {
+            headers: getAuthHeaders()
+        });
+        if (handleUnauthorized(res.status)) return;
+        const json = await res.json();
+
+        if (!res.ok || json.status !== 'success') throw new Error("Помилка отримання списку");
+
+        if (json.data.length === 0) {
+            container.innerHTML = `<p class="text-slate-500 text-sm text-center py-8">У базі поки немає жодного тесту.</p>`;
+            return;
+        }
+
+        container.innerHTML = json.data.map(test => {
+            const title = `${test.meta?.titleHighlight || ''} ${test.meta?.titleMain || 'Без назви'}`.trim();
+            const subtitle = test.meta?.subtitle || 'Без опису';
+            const date = test.created_at ? new Date(test.created_at).toLocaleDateString('uk-UA') : '';
+
+            return `
+                <div class="bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-white">${title}</h3>
+                            <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">${date}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">${subtitle}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="copyTestUrl('${test.id}')" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors" title="Скопіювати посилання для учнів">
+                            🔗 Посилання
+                        </button>
+                        <button onclick="editExistingTest('${test.id}', false)" class="bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-300 border border-indigo-700/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">
+                            ✏️ Редагувати
+                        </button>
+                        <button onclick="editExistingTest('${test.id}', true)" class="bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">
+                            📋 Копіювати
+                        </button>
+                        <button onclick="exportTestToPDF('${test.id}')" class="bg-amber-900/40 hover:bg-amber-800/60 text-amber-300 border border-amber-700/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors" title="Завантажити PDF для друку">
+                            🖨️ PDF
+                        </button>
+                        <button onclick="deleteExistingTest('${test.id}')" class="bg-red-900/30 hover:bg-red-800/50 text-red-400 border border-red-800/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = `<p class="text-red-400 text-xs text-center py-6">Не вдалося завантажити список тестів. Перевірте бекенд.</p>`;
+        console.error(err);
+    }
+}
+
+function copyTestUrl(testId) {
+    const url = `${window.location.origin}/index.html?id=${testId}`;
+    navigator.clipboard.writeText(url).then(() => {
+        alert("🔗 Посилання для учнів скопійовано!");
+    });
+}
+
+async function editExistingTest(testId, isDuplicate = false) {
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`);
+        const json = await res.json();
+
+        if (!res.ok || json.status !== 'success') {
+            alert("Не вдалося завантажити тест");
+            return;
+        }
+
+        const { meta, modules } = json.data;
+        document.getElementById('meta-highlight').value = meta.titleHighlight || '';
+        document.getElementById('meta-main').value = isDuplicate ? `${meta.titleMain || ''} (Копія)`.trim() : (meta.titleMain || '');
+        document.getElementById('meta-subtitle').value = meta.subtitle || '';
+
+        testData = modules || [];
+        document.getElementById('result-box').classList.add('hidden');
+
+        if (isDuplicate) {
+            editingTestId = null;
+            document.getElementById('saveBtn').innerText = "Зберегти копію як новий тест";
+        } else {
+            editingTestId = testId;
+            document.getElementById('saveBtn').innerText = "Оновити тест у базі";
+        }
+
+        renderVisualEditor();
+        switchTab('builder');
+    } catch (err) {
+        alert("Помилка підключення до сервера");
+        console.error(err);
+    }
+}
+
+async function deleteExistingTest(testId) {
+    if (!confirm("Точно видалити цей тест назавжди?")) return;
+
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+if (handleUnauthorized(res.status)) return;
+        if (res.ok) {
+            if (editingTestId === testId) startNewTest();
+            loadTestsList();
+        } else {
+            alert("Помилка при видаленні тесту");
+        }
+    } catch (err) {
+        alert("Помилка з'єднання з сервером");
+        console.error(err);
+    }
+}
+
+// ==========================================
+// 6. ЕКСПОРТ ТЕСТУ В PDF ДЛЯ ДРУКУ (А4)
+// ==========================================
+
+async function exportTestToPDF(testId) {
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`);
+        const json = await res.json();
+
+        if (!res.ok || json.status !== 'success') {
+            alert("Не вдалося завантажити тест для експорту");
+            return;
+        }
+
+        const { meta, modules, author } = json.data;
+        const fullTitle = `${meta.titleHighlight || ''} ${meta.titleMain || 'Тестова робота'}`.trim();
+        const subtitle = meta.subtitle || '';
+        const authorName = author?.name || '';
+
+        // Функція, щоб не дублювати номер, якщо він вже є в тексті питання (напр. "1. Питання")
+        const formatQuestionText = (idx, rawText) => {
+            const text = (rawText || '').trim();
+            if (/^\d+[\.\)]\s*/.test(text)) {
+                return text.replace(/^(\d+[\.\)])/, '<strong>$1</strong>');
+            }
+            return `<strong>${idx + 1}.</strong> ${text}`;
+        };
+
+        const modulesHtml = modules.map((mod, mIdx) => {
+            const modTitle = mod.title || `Завдання ${mIdx + 1}`;
+            const modSub = mod.subtitle || '';
+            let bodyHtml = '';
+
+            // 1. Одиночний вибір (radio)
+            if (mod.type === 'radio' && Array.isArray(mod.data)) {
+                bodyHtml = `<div class="radio-columns">` + mod.data.map((item, qIdx) => `
+                    <div class="question-item">
+                        <p class="q-text">${formatQuestionText(qIdx, item.q)}</p>
+                        <div class="options-grid">
+                            ${(item.opts || []).map(opt => `
+                                <div class="option-line"><span class="checkbox-circle"></span> <span>${opt}</span></div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('') + `</div>`;
+            }
+            // 2. Логічні пари (pairs)
+            else if (mod.type === 'pairs' && Array.isArray(mod.data)) {
+                const leftCol = mod.data.map((item, i) => `
+                    <div class="pair-item"><strong>${i + 1}.</strong> <code>${item.ext}</code></div>
+                `).join('');
+                
+                const shuffledRight = [...mod.data]
+                    .sort(() => Math.random() - 0.5)
+                    .map((item, i) => `
+                        <div class="pair-item"><strong>${String.fromCharCode(1040 + i)})</strong> ${item.desc}</div>
+                    `).join('');
+
+                bodyHtml = `
+                    <div class="pairs-table">
+                        <div>${leftCol}</div>
+                        <div>${shuffledRight}</div>
+                    </div>
+                    <div class="answer-strip">Відповідність: ${mod.data.map((_, i) => `${i + 1} — [ &nbsp;&nbsp; ]`).join(' &nbsp;&nbsp; ')}</div>
+                `;
+            }
+            // 3. Послідовність (ordering)
+            else if (mod.type === 'ordering' && Array.isArray(mod.lists)) {
+                bodyHtml = `<div class="ordering-grid">` + mod.lists.map(list => {
+                    const shuffledItems = [...list.items].sort(() => Math.random() - 0.5);
+                    return `
+                        <div class="ordering-col">
+                            <div class="sub-header">${list.name}</div>
+                            ${shuffledItems.map(item => `
+                                <div class="order-row"><span class="box-square"></span> ${item.text}</div>
+                            `).join('')}
+                        </div>
+                    `;
+                }).join('') + `</div>`;
+            }
+            // 4. Сортування по папках (sorting)
+            else if (mod.type === 'sorting' && Array.isArray(mod.files) && Array.isArray(mod.folders)) {
+                const shuffledFiles = [...mod.files].sort(() => Math.random() - 0.5);
+                bodyHtml = `
+                    <div class="files-pool">
+                        <strong>Елементи:</strong> ${shuffledFiles.map(f => `<span class="file-chip">${f.n}</span>`).join(' ')}
+                    </div>
+                    <div class="folders-grid" style="grid-template-columns: repeat(${Math.min(mod.folders.length, 4)}, 1fr);">
+                        ${mod.folders.map(folder => `
+                            <div class="folder-box">
+                                <div class="folder-title">${folder.name}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            // 5. Пошук помилок (mistakes)
+            else if (mod.type === 'mistakes' && Array.isArray(mod.data)) {
+                bodyHtml = mod.data.map(item => `
+                    <div class="mistake-row">
+                        <span class="box-square"></span> <code>${item.n}</code>
+                    </div>
+                `).join('');
+            }
+            // 6. Заповнення пропусків (fill-in)
+            else if (mod.type === 'fill-in' && Array.isArray(mod.data)) {
+                bodyHtml = mod.data.map((item, i) => `
+                    <p class="fill-row">
+                        <strong>${i + 1}.</strong> ${item.pre} <span class="blank-line"></span> ${item.post}
+                    </p>
+                `).join('');
+            }
+            // 7. Відкриті питання (open)
+            else if (mod.type === 'open' && Array.isArray(mod.data)) {
+                bodyHtml = mod.data.map((item, i) => `
+                    <div class="open-item">
+                        <p class="q-text">${formatQuestionText(i, item.q)}</p>
+                        <div class="write-lines">
+                            <div class="line"></div>
+                            ${item.type !== 'text' ? '<div class="line"></div>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            // 8. Клавіатурний тренажер / текст (typing)
+            else if (mod.type === 'typing' && mod.text) {
+                bodyHtml = `<div class="typing-box">${mod.text}</div>`;
+            }
+
+            return `
+                <div class="module-block">
+                    <div class="module-header">Блок ${mIdx + 1}. ${modTitle}</div>
+                    ${modSub ? `<div class="module-desc">${modSub}</div>` : ''}
+                    ${bodyHtml}
+                </div>
+            `;
+        }).join('');
+
+        const printWindow = window.open('', '_blank', 'width=900,height=1100');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="uk">
+            <head>
+                <meta charset="UTF-8">
+                <title>${fullTitle} — PDF</title>
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 10mm 12mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                    }
+                    body {
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        color: #111;
+                        line-height: 1.32;
+                        font-size: 10.5px;
+                        margin: 0;
+                        background: #e2e8f0;
+                    }
+                    /* Контейнер листа А4 для прев'ю на екрані */
+                    .sheet {
+                        width: 210mm;
+                        min-height: 297mm;
+                        margin: 15px auto;
+                        padding: 10mm 12mm;
+                        background: #fff;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                    }
+                    @media print {
+                        body { background: #fff; }
+                        .sheet {
+                            width: 100%;
+                            min-height: auto;
+                            margin: 0;
+                            padding: 0;
+                            box-shadow: none;
+                        }
+                    }
+                    code {
+                        font-family: Consolas, 'Courier New', monospace;
+                        background: #f1f5f9;
+                        padding: 1px 4px;
+                        border-radius: 3px;
+                        font-size: 10px;
+                    }
+                    .header-box {
+                        border-bottom: 1.5px solid #111;
+                        padding-bottom: 6px;
+                        margin-bottom: 10px;
+                    }
+                    .title { font-size: 16px; font-weight: 700; margin: 0 0 2px 0; }
+                    .subtitle { font-size: 10.5px; color: #444; margin: 0 0 6px 0; }
+                    .student-meta {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 12px;
+                        font-size: 10.5px;
+                        margin-top: 6px;
+                    }
+                    .student-meta span { flex: 1; border-bottom: 1px solid #333; padding-bottom: 1px; }
+                    .module-block {
+                        margin-bottom: 10px;
+                    }
+                    .module-header {
+                        font-weight: 700;
+                        font-size: 11.5px;
+                        background: #f1f5f9;
+                        padding: 3px 7px;
+                        border-left: 3px solid #0f172a;
+                        margin-bottom: 5px;
+                        page-break-after: avoid;
+                    }
+                    .module-desc { font-style: italic; color: #333; margin-bottom: 5px; font-size: 10px; }
+                    
+                    /* Компактна двоколонкова сітка для тестів з вибором */
+                    .radio-columns {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 6px 14px;
+                    }
+                    .question-item {
+                        break-inside: avoid;
+                        padding: 3px 5px;
+                        border-bottom: 1px dashed #e2e8f0;
+                    }
+                    .q-text { margin: 0 0 3px 0; font-size: 10.5px; }
+                    .options-grid { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; }
+                    .option-line { display: flex; align-items: flex-start; gap: 5px; font-size: 10px; }
+                    .checkbox-circle {
+                        display: inline-block; width: 9px; height: 9px; margin-top: 2px;
+                        border: 1.2px solid #222; border-radius: 50%; flex-shrink: 0;
+                    }
+                    .box-square {
+                        display: inline-block; width: 10px; height: 10px; margin-top: 1px;
+                        border: 1.2px solid #222; margin-right: 6px; flex-shrink: 0;
+                    }
+                    .pairs-table { display: grid; grid-template-columns: 0.8fr 1.6fr; gap: 12px; margin-bottom: 5px; }
+                    .pair-item { margin-bottom: 3px; font-size: 10px; }
+                    .answer-strip { font-weight: 600; margin-top: 4px; font-size: 10.5px; }
+                    .ordering-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                    .sub-header { font-weight: 600; margin-bottom: 3px; color: #333; font-size: 10.5px; }
+                    .order-row { margin-bottom: 3px; display: flex; align-items: flex-start; font-size: 10px; }
+                    .files-pool { margin-bottom: 6px; line-height: 1.6; }
+                    .file-chip {
+                        display: inline-block; border: 1px solid #64748b; border-radius: 3px;
+                        padding: 0 5px; margin-right: 3px; font-family: Consolas, monospace; font-size: 10px;
+                    }
+                    .folders-grid { display: grid; gap: 6px; }
+                    .folder-box { border: 1.2px solid #334155; border-radius: 4px; padding: 4px; min-height: 55px; }
+                    .folder-title { font-weight: 700; text-align: center; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; font-size: 10.5px; }
+                    .mistake-row { margin-bottom: 3px; display: flex; align-items: flex-start; font-size: 10px; }
+                    .fill-row { margin-bottom: 5px; line-height: 1.5; }
+                    .blank-line { display: inline-block; width: 95px; border-bottom: 1.2px solid #111; }
+                    .open-item { margin-bottom: 6px; }
+                    .write-lines .line { border-bottom: 1px solid #888; height: 17px; }
+                    .typing-box { border: 1px solid #94a3b8; padding: 6px; font-family: Consolas, monospace; background: #f8fafc; font-size: 10px; }
+                    .footer {
+                        margin-top: 12px; padding-top: 4px; border-top: 1px solid #ccc;
+                        font-size: 9px; color: #666; display: flex; justify-content: space-between;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="sheet">
+                    <div class="header-box">
+                        <h1 class="title">${fullTitle}</h1>
+                        ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}
+                        <div class="student-meta">
+                            <span>Прізвище та ім'я:</span>
+                            <span style="max-width: 130px;">Клас / Група:</span>
+                            <span style="max-width: 110px;">Дата:</span>
+                        </div>
+                    </div>
+
+                    ${modulesHtml}
+
+                    <div class="footer">
+                        <span>OS Explorer • Платформа тестувань</span>
+                        <span>${authorName ? `Автор: ${authorName}` : ''}</span>
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = () => {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    } catch (err) {
+        alert("Помилка при формуванні PDF");
+        console.error(err);
+    }
+}
