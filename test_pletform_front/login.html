@@ -39,6 +39,7 @@
         <p id="login-error" class="hidden text-red-400 text-xs mt-4"></p>
     </div>
 
+    <script src="config.js"></script>
     <script>
         // Якщо вже є токен — одразу кидаємо в кабінет
         if (localStorage.getItem('auth_token')) {
@@ -50,7 +51,7 @@
             errorEl.classList.add('hidden');
 
             try {
-                const res = await fetch('http://127.0.0.1:8000/api/auth/google', {
+                const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ credential: response.credential })
