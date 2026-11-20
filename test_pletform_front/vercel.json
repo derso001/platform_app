@@ -1,1 +1,16 @@
-{"outputDirectory": "."}
+{
+  "outputDirectory": ".",
+  "redirects": [
+    {
+      "source": "/",
+      "missing": [
+        {
+          "type": "query",
+          "key": "id"
+        }
+      ],
+      "destination": "/login.html",
+      "permanent": false
+    }
+  ]
+}
