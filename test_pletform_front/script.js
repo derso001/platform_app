@@ -2,9 +2,37 @@
 // 1. БАЗА ДАНИХ ТА КОНФІГУРАЦІЯ МОДУЛІВ
 // ==========================================
 
-// Тепер це просто порожні змінні, які ми заповнимо даними з сервера
 let testMeta = {};
 let testModules = [];
+let testAuthor = null;
+let currentStudentName = "";
+let currentTestId = null;
+
+// Логіка модального вікна вводу імені
+const authModal = document.getElementById('student-auth-modal');
+const nameInput = document.getElementById('student-name-input');
+const nameError = document.getElementById('student-name-error');
+const startTestBtn = document.getElementById('startTestBtn');
+
+function confirmStudentName() {
+    const val = nameInput.value.trim();
+    if (val.length < 3) {
+        nameError.classList.remove('hidden');
+        return;
+    }
+    nameError.classList.add('hidden');
+    currentStudentName = val;
+    authModal.classList.add('hidden');
+    
+    // Оновлюємо плашку в шапці, якщо тест вже завантажився
+    const badge = document.getElementById('student-badge-name');
+    if (badge) badge.innerText = currentStudentName;
+}
+
+startTestBtn.addEventListener('click', confirmStudentName);
+nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmStudentName();
+});
 
 // ==========================================
 // 2. РЕНДЕРИНГ (ГЕНЕРАЦІЯ HTML)
@@ -178,6 +206,10 @@ function initApp() {
             <span class="neon-text-cyan">${testMeta.titleHighlight}</span> ${testMeta.titleMain}
         </h1>
         <p class="text-slate-400 text-xs">${testMeta.subtitle}</p>
+        <div class="flex flex-wrap justify-center gap-3 mt-3 text-[11px] font-mono">
+            ${testAuthor?.name ? `<span class="px-2.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-300">Автор: ${testAuthor.name}</span>` : ''}
+            <span class="px-2.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-500/30 text-cyan-300">Учень: <strong id="student-badge-name">${currentStudentName || '...'}</strong></span>
+        </div>
     `;
 
     appContainer.innerHTML = ''; 
@@ -508,7 +540,130 @@ const answerRevealers = {
     'typing': () => {}
 };
 
-submitBtn.addEventListener('click', () => {
+function collectStudentDetails() {
+    const report = [];
+
+    testModules.forEach((mod, index) => {
+        const modIdx = index + 1;
+        const modEntry = {
+            title: mod.title || `Блок ${modIdx}`,
+            type: mod.type,
+            items: []
+        };
+
+        if (mod.type === 'radio') {
+            document.querySelectorAll(`#mod-${modIdx} .test-block`).forEach((block, qIdx) => {
+                const qData = mod.data[qIdx];
+                const selected = block.querySelector('input:checked');
+                const userIdx = selected ? parseInt(selected.value, 10) : null;
+                const correctIdx = parseInt(block.dataset.ans, 10);
+
+                modEntry.items.push({
+                    question: qData.q,
+                    userAnswer: userIdx !== null ? qData.opts[userIdx] : 'Не обрано',
+                    correctAnswer: qData.opts[correctIdx],
+                    isCorrect: userIdx === correctIdx
+                });
+            });
+        } 
+        else if (mod.type === 'pairs') {
+            document.querySelectorAll(`#mod-${modIdx} .pair-row`).forEach((row, rIdx) => {
+                const pData = mod.data[rIdx];
+                const dropZone = row.querySelector('.pair-drop-zone');
+                const droppedCard = dropZone.children.length > 0 ? dropZone.children[0] : null;
+                const isCorrect = droppedCard ? droppedCard.dataset.type === row.dataset.type : false;
+
+                modEntry.items.push({
+                    question: pData.ext,
+                    userAnswer: droppedCard ? droppedCard.innerText.trim() : 'Не заповнено',
+                    correctAnswer: pData.desc,
+                    isCorrect: isCorrect
+                });
+            });
+        } 
+        else if (mod.type === 'ordering') {
+            document.querySelectorAll(`#mod-${modIdx} .ordering-list`).forEach((list, lIdx) => {
+                const lData = mod.lists[lIdx];
+                const userIds = Array.from(list.children).map(e => e.dataset.id);
+                const userTexts = Array.from(list.children).map(e => e.innerText.replace('⋮⋮', '').trim());
+                const correctTexts = lData.correct.map(id => lData.items.find(it => it.id === id)?.text || id);
+
+                modEntry.items.push({
+                    question: lData.name,
+                    userAnswer: userTexts.join(' → '),
+                    correctAnswer: correctTexts.join(' → '),
+                    isCorrect: userIds.join(',') === list.dataset.correct
+                });
+            });
+        } 
+        else if (mod.type === 'sorting') {
+            document.querySelectorAll(`#section-mod-${modIdx} .sortable-folder`).forEach(folder => {
+                const fType = folder.dataset.ftype;
+                const fName = mod.folders.find(f => f.id === fType)?.name || fType;
+                Array.from(folder.children).forEach(item => {
+                    modEntry.items.push({
+                        question: item.innerText.trim(),
+                        userAnswer: `Папка: ${fName}`,
+                        correctAnswer: mod.folders.find(f => f.id === item.dataset.t)?.name || item.dataset.t,
+                        isCorrect: item.dataset.t === fType
+                    });
+                });
+            });
+            document.querySelectorAll(`#pool-${modIdx} .sorting-item`).forEach(item => {
+                modEntry.items.push({
+                    question: item.innerText.trim(),
+                    userAnswer: 'Не розсортовано',
+                    correctAnswer: mod.folders.find(f => f.id === item.dataset.t)?.name || item.dataset.t,
+                    isCorrect: false
+                });
+            });
+        } 
+        else if (mod.type === 'mistakes') {
+            document.querySelectorAll(`#mod-${modIdx} .mistake-block`).forEach((block, bIdx) => {
+                const isChecked = block.querySelector('input').checked;
+                const isBad = block.dataset.bad === 'true';
+                modEntry.items.push({
+                    question: mod.data[bIdx].n,
+                    userAnswer: isChecked ? 'Позначено як помилку' : 'Не позначено',
+                    correctAnswer: isBad ? 'Є помилка' : 'Без помилок',
+                    isCorrect: isChecked === isBad
+                });
+            });
+        } 
+        else if (mod.type === 'fill-in') {
+            document.querySelectorAll(`#mod-${modIdx} .fill-input`).forEach((input, fIdx) => {
+                const fData = mod.data[fIdx];
+                const userVal = input.value.trim();
+                const isCorrect = Boolean(userVal && input.dataset.ans.includes(userVal.toLowerCase()));
+                modEntry.items.push({
+                    question: `${fData.pre} [___] ${fData.post}`,
+                    userAnswer: userVal || 'Порожньо',
+                    correctAnswer: fData.ans,
+                    isCorrect: isCorrect
+                });
+            });
+        } 
+        else if (mod.type === 'open') {
+            mod.data.forEach(item => {
+                const userVal = document.getElementById(item.id).value.trim();
+                modEntry.items.push({
+                    question: item.q,
+                    userAnswer: userVal || 'Немає відповіді',
+                    correctAnswer: item.ans || 'Перевіряється вручну',
+                    isCorrect: userVal.length > 5
+                });
+            });
+        }
+
+        if (modEntry.items.length > 0) {
+            report.push(modEntry);
+        }
+    });
+
+    return { modules: report };
+}
+
+submitBtn.addEventListener('click', async () => {
     if (isSubmitted) return;
     isSubmitted = true;
     let totalScore = 0;
@@ -523,15 +678,44 @@ submitBtn.addEventListener('click', () => {
 
     submitBtn.classList.add('hidden');
     
+    const finalPoints = Math.min(totalScore, 100);
     const resultBox = document.getElementById('result-box');
+    const saveStatusMsg = document.getElementById('save-status-msg');
     resultBox.classList.remove('hidden');
     
-    document.getElementById('final-score').innerText = `${Math.min(totalScore, 100)} / 100`;
-    document.getElementById('feedback-msg').innerText = totalScore >= 85 ? "Чудово!" : (totalScore >= 60 ? "Добре!" : "Треба повторити.");
+    document.getElementById('final-score').innerText = `${finalPoints} / 100`;
+    document.getElementById('feedback-msg').innerText = finalPoints >= 85 ? "Чудово!" : (finalPoints >= 60 ? "Добре!" : "Треба повторити.");
     
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
     document.querySelectorAll('.draggable-card').forEach(e => e.style.pointerEvents = 'none');
+
+    // Відправляємо результат в кабінет викладача
+    if (currentTestId && currentStudentName) {
+        saveStatusMsg.innerText = "Збереження результату...";
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/api/tests/${currentTestId}/results`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_name: currentStudentName,
+                    score: finalPoints,
+                    max_score: 100,
+                    percentage: finalPoints,
+                    details: collectStudentDetails()
+                })
+            });
+            if (res.ok) {
+                saveStatusMsg.innerText = "✅ Результат успішно надіслано викладачу";
+                saveStatusMsg.classList.replace('text-slate-400', 'text-emerald-400');
+            } else {
+                saveStatusMsg.innerText = "⚠️ Не вдалося зберегти результат на сервері";
+                saveStatusMsg.classList.replace('text-slate-400', 'text-amber-400');
+            }
+        } catch (err) {
+            saveStatusMsg.innerText = "⚠️ Помилка мережі при збереженні результату";
+            saveStatusMsg.classList.replace('text-slate-400', 'text-red-400');
+        }
+    }
 });
 
 // ==========================================
@@ -559,8 +743,10 @@ async function loadTestFromAPI() {
         const result = await response.json();
 
         if (response.ok && result.status === 'success') {
+            currentTestId = testId;
             testMeta = result.data.meta;
             testModules = result.data.modules;
+            testAuthor = result.data.author;
             
             // Якщо дані успішно отримані — запускаємо генерацію сторінки
             initApp(); 

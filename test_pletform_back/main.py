@@ -1,6 +1,7 @@
 import os
 import jwt
 import datetime
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +11,8 @@ from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from dotenv import load_dotenv
-
 from database import engine, Base, get_db
-from models import TestDB, UserDB
+from models import TestDB, UserDB, TestResultDB
 
 load_dotenv()
 
@@ -24,7 +24,7 @@ app = FastAPI(title="OS Explorer Test Platform API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],  # Після деплою Vercel сюди можна вписати конкретний домен
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +37,13 @@ class TestCreate(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     credential: str
+
+class ResultSubmit(BaseModel):
+    student_name: str
+    score: int
+    max_score: int
+    percentage: float
+    details: Optional[dict] = None
 
 # Допоміжні функції авторизації
 def create_access_token(user_id: str, email: str):
@@ -214,3 +221,89 @@ async def delete_test(
     await db.delete(test)
     await db.commit()
     return {"status": "success", "message": "Тест видалено"}
+
+# 6. ЗБЕРЕГТИ РЕЗУЛЬТАТ ПРОХОДЖЕННЯ (Для учня — без авторизації)
+@app.post("/api/tests/{test_id}/results")
+async def submit_test_result(test_id: str, res_data: ResultSubmit, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TestDB).where(TestDB.id == test_id))
+    test = result.scalars().first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Тест не знайдено")
+
+    new_result = TestResultDB(
+        test_id=test_id,
+        student_name=res_data.student_name.strip(),
+        score=res_data.score,
+        max_score=res_data.max_score,
+        percentage=res_data.percentage,
+        details=res_data.details
+    )
+    db.add(new_result)
+    await db.commit()
+    return {"status": "success", "message": "Результат збережено"}
+
+# 7. ОТРИМАТИ РЕЗУЛЬТАТИ ТЕСТУ (Тільки для автора тесту)
+@app.get("/api/tests/{test_id}/results")
+async def get_test_results(
+    test_id: str, 
+    db: AsyncSession = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
+    test_res = await db.execute(select(TestDB).where(TestDB.id == test_id))
+    test = test_res.scalars().first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Тест не знайдено")
+    if test.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Немає доступу до результатів чужого тесту")
+
+    results_query = await db.execute(
+        select(TestResultDB)
+        .where(TestResultDB.test_id == test_id)
+        .order_by(TestResultDB.submitted_at.desc())
+    )
+    results = results_query.scalars().all()
+
+    return {
+        "status": "success",
+        "test_title": f"{test.meta_data.get('titleHighlight', '')} {test.meta_data.get('titleMain', '')}".strip(),
+        "data": [
+            {
+                "id": r.id,
+                "student_name": r.student_name,
+                "score": r.score,
+                "max_score": r.max_score,
+                "percentage": r.percentage,
+                "submitted_at": r.submitted_at
+            } for r in results
+        ]
+    }
+
+# 8. ОТРИМАТИ ДЕТАЛЬНІ ВІДПОВІДІ КОНКРЕТНОГО УЧНЯ
+@app.get("/api/results/{result_id}")
+async def get_single_result_details(
+    result_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    res_query = await db.execute(select(TestResultDB).where(TestResultDB.id == result_id))
+    res_item = res_query.scalars().first()
+    if not res_item:
+        raise HTTPException(status_code=404, detail="Результат не знайдено")
+
+    test_query = await db.execute(select(TestDB).where(TestDB.id == res_item.test_id))
+    test = test_query.scalars().first()
+    if not test or test.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Немає доступу до цього результату")
+
+    return {
+        "status": "success",
+        "data": {
+            "id": res_item.id,
+            "test_id": res_item.test_id,
+            "student_name": res_item.student_name,
+            "score": res_item.score,
+            "max_score": res_item.max_score,
+            "submitted_at": res_item.submitted_at,
+            "details": res_item.details
+        }
+    }

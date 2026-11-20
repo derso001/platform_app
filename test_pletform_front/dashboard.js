@@ -616,6 +616,9 @@ async function loadTestsList() {
                         <button onclick="editExistingTest('${test.id}', true)" class="bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors">
                             📋 Копіювати
                         </button>
+                        <button onclick="openTestResults('${test.id}')" style="background-color: rgba(6, 78, 59, 0.4); border-color: rgba(4, 120, 87, 0.6); color: #6ee7b7;" class="hover:opacity-80 border px-2.5 py-1.5 rounded text-[11px] font-medium transition-all" title="Переглянути оцінки учнів">
+                            📊 Результати
+                        </button>
                         <button onclick="exportTestToPDF('${test.id}')" class="bg-amber-900/40 hover:bg-amber-800/60 text-amber-300 border border-amber-700/60 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors" title="Завантажити PDF для друку">
                             🖨️ PDF
                         </button>
@@ -991,4 +994,169 @@ async function exportTestToPDF(testId) {
         alert("Помилка при формуванні PDF");
         console.error(err);
     }
+}
+
+// ==========================================
+// 7. ЖУРНАЛ РЕЗУЛЬТАТІВ УЧНІВ ТА ДЕТАЛЬНИЙ РОЗБІР
+// ==========================================
+let currentOpenedTestId = null;
+
+async function openTestResults(testId) {
+    currentOpenedTestId = testId;
+    const modal = document.getElementById('results-modal');
+    const body = document.getElementById('results-modal-body');
+    const sub = document.getElementById('results-modal-subtitle');
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    sub.innerText = "Завантаження...";
+    body.innerHTML = `<p class="text-xs text-slate-400 text-center py-8 animate-pulse">Отримання даних з бази...</p>`;
+
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}/results`, {
+            headers: getAuthHeaders()
+        });
+        if (handleUnauthorized(res.status)) return;
+
+        const json = await res.json();
+        if (!res.ok || json.status !== 'success') {
+            body.innerHTML = `<p class="text-xs text-red-400 text-center py-6">${json.detail || 'Помилка завантаження'}</p>`;
+            return;
+        }
+
+        sub.innerText = `${json.test_title} • Всього робіт: ${json.data.length} (натисніть на рядок для перегляду відповідей)`;
+
+        if (json.data.length === 0) {
+            body.innerHTML = `<p class="text-xs text-slate-400 text-center py-8">Ще жоден учень не пройшов цей тест.</p>`;
+            return;
+        }
+
+        const rows = json.data.map((r, i) => {
+            const dateStr = new Date(r.submitted_at + 'Z').toLocaleString('uk-UA', {
+                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+            });
+            const scoreStyle = r.score >= 85 
+                ? 'color: #34d399; border-color: rgba(16, 185, 129, 0.4); background: rgba(6, 78, 59, 0.3);'
+                : r.score >= 60 
+                ? 'color: #fbbf24; border-color: rgba(245, 158, 11, 0.4); background: rgba(120, 53, 15, 0.3);'
+                : 'color: #f87171; border-color: rgba(239, 68, 68, 0.4); background: rgba(127, 29, 29, 0.3);';
+
+            return `
+                <tr onclick="openResultDetails('${r.id}')" class="border-b border-slate-800/80 hover:bg-slate-800/60 cursor-pointer transition-colors text-xs group">
+                    <td class="py-2.5 px-3 text-slate-500 font-mono">${i + 1}</td>
+                    <td class="py-2.5 px-3 font-medium text-white group-hover:text-cyan-400 transition-colors">${r.student_name}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <span style="${scoreStyle}" class="px-2.5 py-0.5 rounded border font-mono font-bold inline-block">${r.score} / ${r.max_score}</span>
+                    </td>
+                    <td class="py-2.5 px-3 text-right text-slate-400 font-mono text-[11px]">
+                        ${dateStr} <span class="ml-2 text-cyan-400 opacity-60 group-hover:opacity-100">→</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        body.innerHTML = `
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-700 text-[11px] text-slate-400 uppercase">
+                        <th class="py-2 px-3">#</th>
+                        <th class="py-2 px-3">Учень</th>
+                        <th class="py-2 px-3 text-center">Результат</th>
+                        <th class="py-2 px-3 text-right">Дата і час</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    } catch (err) {
+        body.innerHTML = `<p class="text-xs text-red-400 text-center py-6">Помилка з'єднання із сервером</p>`;
+    }
+}
+
+async function openResultDetails(resultId) {
+    const body = document.getElementById('results-modal-body');
+    const sub = document.getElementById('results-modal-subtitle');
+
+    body.innerHTML = `<p class="text-xs text-slate-400 text-center py-8 animate-pulse">Завантаження відповідей учня...</p>`;
+
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/results/${resultId}`, {
+            headers: getAuthHeaders()
+        });
+        if (handleUnauthorized(res.status)) return;
+
+        const json = await res.json();
+        if (!res.ok || json.status !== 'success') {
+            body.innerHTML = `<p class="text-xs text-red-400 text-center py-6">${json.detail || 'Помилка завантаження'}</p>`;
+            return;
+        }
+
+        const data = json.data;
+        const dateStr = new Date(data.submitted_at + 'Z').toLocaleString('uk-UA', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        sub.innerText = `${data.student_name} • Оцінка: ${data.score}/${data.max_score} • ${dateStr}`;
+
+        let detailsHtml = `
+            <div class="mb-4">
+                <button onclick="openTestResults('${data.test_id}')" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-3 py-1 rounded text-xs font-medium transition-colors">
+                    ← Назад до списку учнів
+                </button>
+            </div>
+        `;
+
+        if (!data.details || !Array.isArray(data.details.modules) || data.details.modules.length === 0) {
+            detailsHtml += `<p class="text-xs text-slate-400 text-center py-6">Детальні відповіді для цієї спроби не збережені (старий формат запису).</p>`;
+            body.innerHTML = detailsHtml;
+            return;
+        }
+
+        detailsHtml += `<div class="space-y-4">`;
+        data.details.modules.forEach((mod, mIdx) => {
+            const itemsHtml = mod.items.map((item, iIdx) => {
+                const statusBadge = item.isCorrect 
+                    ? `<span style="color: #34d399;" class="font-bold">✅ Вірно</span>` 
+                    : `<span style="color: #f87171;" class="font-bold">❌ Помилка</span>`;
+                const borderStyle = item.isCorrect 
+                    ? 'border-color: rgba(16, 185, 129, 0.3); background: rgba(6, 78, 59, 0.15);' 
+                    : 'border-color: rgba(239, 68, 68, 0.3); background: rgba(127, 29, 29, 0.15);';
+
+                return `
+                    <div style="${borderStyle}" class="p-2.5 rounded border text-xs mb-2">
+                        <div class="flex justify-between items-start gap-2 mb-1">
+                            <span class="font-medium text-slate-200">${iIdx + 1}. ${item.question}</span>
+                            <span class="flex-shrink-0 text-[11px]">${statusBadge}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-300 mt-1">
+                            <span class="text-slate-400">Відповідь учня:</span> <strong>${item.userAnswer}</strong>
+                        </div>
+                        ${!item.isCorrect ? `
+                            <div class="text-[11px] text-slate-400 mt-0.5">
+                                <span>Правильна відповідь:</span> <span style="color: #34d399;">${item.correctAnswer}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            detailsHtml += `
+                <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+                    <h4 class="text-xs font-bold text-cyan-400 mb-2.5">Блок ${mIdx + 1}. ${mod.title}</h4>
+                    ${itemsHtml}
+                </div>
+            `;
+        });
+        detailsHtml += `</div>`;
+
+        body.innerHTML = detailsHtml;
+    } catch (err) {
+        body.innerHTML = `<p class="text-xs text-red-400 text-center py-6">Помилка завантаження деталей</p>`;
+    }
+}
+
+function closeResultsModal() {
+    const modal = document.getElementById('results-modal');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
 }
