@@ -500,9 +500,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     const saveBtn = document.getElementById('saveBtn');
     const isUpdating = Boolean(editingTestId);
-    const url = isUpdating 
-        ? `http://127.0.0.1:8000/api/tests/${editingTestId}` 
-        : 'http://127.0.0.1:8000/api/tests/';
+    const url = isUpdating
+        ? `${API_BASE_URL}/api/tests/${editingTestId}`
+        : `${API_BASE_URL}/api/tests/`;
     const method = isUpdating ? 'PUT' : 'POST';
 
     saveBtn.innerText = isUpdating ? "Оновлення..." : "Збереження...";
@@ -579,7 +579,7 @@ async function loadTestsList() {
     container.innerHTML = `<p class="text-cyan-400 text-xs font-mono animate-pulse text-center py-6">Завантаження тестів...</p>`;
 
     try {
-        const res = await fetch('http://127.0.0.1:8000/api/tests/', {
+        const res = await fetch(`${API_BASE_URL}/api/tests/`, {
             headers: getAuthHeaders()
         });
         if (handleUnauthorized(res.status)) return;
@@ -644,7 +644,7 @@ function copyTestUrl(testId) {
 
 async function editExistingTest(testId, isDuplicate = false) {
     try {
-        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`);
+        const res = await fetch(`${API_BASE_URL}/api/tests/${testId}`);
         const json = await res.json();
 
         if (!res.ok || json.status !== 'success') {
@@ -680,7 +680,7 @@ async function deleteExistingTest(testId) {
     if (!confirm("Точно видалити цей тест назавжди?")) return;
 
     try {
-        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/tests/${testId}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -703,7 +703,7 @@ if (handleUnauthorized(res.status)) return;
 
 async function exportTestToPDF(testId) {
     try {
-        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`);
+        const res = await fetch(`${API_BASE_URL}/api/tests/${testId}`);
         const json = await res.json();
 
         if (!res.ok || json.status !== 'success') {
@@ -1013,7 +1013,7 @@ async function openTestResults(testId) {
     body.innerHTML = `<p class="text-xs text-slate-400 text-center py-8 animate-pulse">Отримання даних з бази...</p>`;
 
     try {
-        const res = await fetch(`http://127.0.0.1:8000/api/tests/${testId}/results`, {
+        const res = await fetch(`${API_BASE_URL}/api/tests/${testId}/results`, {
             headers: getAuthHeaders()
         });
         if (handleUnauthorized(res.status)) return;
@@ -1080,7 +1080,7 @@ async function openResultDetails(resultId) {
     body.innerHTML = `<p class="text-xs text-slate-400 text-center py-8 animate-pulse">Завантаження відповідей учня...</p>`;
 
     try {
-        const res = await fetch(`http://127.0.0.1:8000/api/results/${resultId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/results/${resultId}`, {
             headers: getAuthHeaders()
         });
         if (handleUnauthorized(res.status)) return;

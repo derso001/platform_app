@@ -693,7 +693,7 @@ submitBtn.addEventListener('click', async () => {
     if (currentTestId && currentStudentName) {
         saveStatusMsg.innerText = "Збереження результату...";
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/tests/${currentTestId}/results`, {
+            const res = await fetch(`${API_BASE_URL}/api/tests/${currentTestId}/results`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -739,7 +739,7 @@ async function loadTestFromAPI() {
         header.innerHTML = `<div class="mt-10"><p class="text-cyan-400 font-mono animate-pulse">З'єднання з базою даних...</p></div>`;
         
         // Звертаємось до FastAPI сервера (переконайся, що він запущений на 8000 порту)
-        const response = await fetch(`http://127.0.0.1:8000/api/tests/${testId}`);
+        const response = await fetch(`${API_BASE_URL}/api/tests/${testId}`);
         const result = await response.json();
 
         if (response.ok && result.status === 'success') {
